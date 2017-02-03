@@ -23,6 +23,13 @@ ship3 = [50, [0, 15000], [1000, 0]]
 
 ship4 = [50, [0, -15000], [-1000, 0]]
 
+#This array will set the objects present at runtime.
+#The ship and planet objects as defined above will produce four symmetric
+#slingshot orbits. You can set whatever you want as the objects! The display
+#class has been designed to scale the object size to the resolution so that
+#everything will fit on the screen. Be aware that if there is a big disparity
+#in orders of magnitude between the size of objects, one might appear to not
+#be present because it's scaled too small on the screen
 bodies = [planet, ship, ship2, ship3, ship4]
 
 #Gravitational Constant
