@@ -2,39 +2,28 @@ import math
 import Tkinter
 import time as clock
 
-#Array class: body
-#Ship
-	#array: [Mass, Vel Arr, position Arr]
-#Planet
-	#array: [Mass, Vel Arr, position Arr, Radius]
+#This is a 2d physics simulator made using python default libraries
 
-#Array class: forces
-#array: [[F1x, F1y], [F2x, F2y], ... [FNx, FNy]]
-		  #Big mass for good gravity			 
-planet = [9999999999999999999999, [0, 0], [0, 0], 200]
+#CLASSES
+#####################################
+class Body:
+	def __init__(self, mass, velocityArray, positionArray):
+		self.mass = mass
+		self.mass = mass
+		self.velocityArray = velocityArray
+		self.positionArray = positionArray
 
-moon = [33333333333333333, [0, 0], [500, 0], 40]
+class CelestialBody(Body):
+	def __init__(self, mass, velocityArray, positionArray, radius):
+		Body.__init__(self, mass, velocityArray, positionArray)
+		self.radius = radius
 
-ship = [50, [-15000, 0], [0, 1000]]
-
-ship2 = [50, [15000, 0], [0, -1000]]
-
-ship3 = [50, [0, 15000], [1000, 0]]
-
-ship4 = [50, [0, -15000], [-1000, 0]]
-
-#This array will set the objects present at runtime.
-#The ship and planet objects as defined above will produce four symmetric
-#slingshot orbits. You can set whatever you want as the objects! The display
-#class has been designed to scale the object size to the resolution so that
-#everything will fit on the screen. Be aware that if there is a big disparity
-#in orders of magnitude between the size of objects, one might appear to not
-#be present because it's scaled too small on the screen
-bodies = [planet, ship, ship2, ship3, ship4]
-
+#GLOBAL CONSTANTS
+#####################################
 #Gravitational Constant
 gc = 0.00000000006674
 
+#Start at the beginning
 time = 0
 
 #dt for the physics, more granular = more accurate but more complex
@@ -49,119 +38,155 @@ DataLog = False
 #Resolution of the square view frame in px
 resolution = 750
 
+#Used to determine if a ship has landed or left the screen (for the animation to continue or not)
 lc = 0
 
+#OBJECTS IN ANIMATION
+#####################################
+planet = CelestialBody(9999999999999999999999, [0, 0], [0, 0], 200)
+
+moon = CelestialBody(33333333333333333, [0, 0], [500, 0], 40)
+
+ship1 = Body(50, [-15000, 0], [0, 1000])
+
+ship2 = Body(50, [15000, 0], [0, -1000])
+
+ship3 = Body(50, [0, 15000], [1000, 0])
+
+ship4 = Body(50, [0, -15000], [-1000, 0])
+
+#This array will set the objects present at runtime.
+#The ship and planet objects as defined above will produce four symmetric
+#slingshot orbits. You can set whatever you want as the objects! The display
+#class has been designed to scale the object size to the resolution so that
+#everything will fit on the screen. Be aware that if there is a big disparity
+#in orders of magnitude between the size of objects, one might appear to not
+#be present because it's scaled too small on the screen. Note that because of
+#that, ships will always be drawn at a fixed 5px to ensure they're visible,
+#regardless of their encoded size
+bodies = [planet, ship1, ship2, ship3, ship4]
 #Calculate the distance between two bodies
-def detdist(b1, b2):
-	ps1 = b1[2]
-	ps2 = b2[2]
-	delt1 = ps2[0] - ps1[0]
-	delt2 = ps2[1] - ps1[1]
-	r = delt1*delt1 + delt2*delt2
-	r = math.sqrt(r)
-	return r
+
+def distanceBetweenBodies(body1, body2):
+	positionOfBody1 = body1.positionArray
+	positionOfBody2 = body2.positionArray
+	xDelta = positionOfBody2[0] - positionOfBody1[0]
+	yDelta = positionOfBody2[1] - positionOfBody1[1]
+	hypotenuse = xDelta*xDelta + yDelta*yDelta
+	distance = math.sqrt(hypotenuse)
+
+	return distance
 
 #calculate the angle of the vector from body 1 to body 2
-def anglecalc(b1, b2):
-	ps1 = b1[2]
-	ps2 = b2[2]
-	delt1 = ps2[0] - ps1[0]
-	delt2 = ps2[1] - ps1[1]
-	return math.atan2(delt2, delt1)
+def angleBetweenBodies(body1, body2):
+	positionOfBody1 = body1.positionArray
+	positionOfBody2 = body2.positionArray
+	xDelta = positionOfBody2[0] - positionOfBody1[0]
+	yDelta = positionOfBody2[1] - positionOfBody1[1]
+	angle = math.atan2(yDelta, xDelta)
+
+	return angle
 
 #Take a scalar force and the angle of the vector, convert to an array representation
-def scal2arr(angle, force):
-	xratio = math.cos(angle)
-	yratio = math.sin(angle)
-	x = xratio*force
-	y = yratio*force
-	return [x, y]
+def getForceVectorFromScalarAndAngle(forceAngle, forceScalar):
+	forceRatioForX = math.cos(forceAngle)
+	forceRatioForY = math.sin(forceAngle)
+	x = forceRatioForX*forceScalar
+	y = forceRatioForY*forceScalar
+	forceVector = [x, y]
+
+	return forceVector
 
 #Get the gravitational force between two bodies, returns one for each direction
-def instgf(b1, b2):
+def instantaneousGravitationalForcesBetweenTwoBodies(body1, body2):
 	global gc
-	r = detdist(b1, b2)
-	scalf = gc*b1[0]*b2[0]/(r*r)
-	angleb1 = anglecalc(b1, b2)
-	angleb2 = anglecalc(b2, b1)
-	return [scal2arr(angleb1, scalf), scal2arr(angleb2, scalf)]
 
+	distance = distanceBetweenBodies(body1, body2)
+	gravitationalForceScalar = gc*body1.mass*body2.mass/(distance*distance)
+	angleFromBody1 = angleBetweenBodies(body1, body2)
+	angleFromBody2 = angleBetweenBodies(body2, body1)
+
+	listOfForceVectors = [getForceVectorFromScalarAndAngle(angleFromBody1, gravitationalForceScalar), getForceVectorFromScalarAndAngle(angleFromBody2, gravitationalForceScalar)]
+
+	return listOfForceVectors
+
+#C A L C U L U S
 #Given a current body the net force acting on it and dt, calculate the new body data
-def update(body, force, time):
-	velocity = body[1]
-	for i in xrange(len(velocity)):
-		delta = velocity[i]*time + .5*(force[i]/body[0])*time*time
-		body[2][i] += delta
-		veldel = (force[i]/body[0])*time
-		body[1][i] += veldel
-	return body
+#Adapted for arbitrary dimensions
+def update(body, force, timeDelta):
+	velocity = body.velocityArray
 
+	for i in xrange(len(velocity)):
+		positionDelta = velocity[i]*timeDelta + .5*(force[i]/body.mass)*timeDelta*timeDelta
+		body.positionArray[i] += positionDelta
+		velocityDelta = (force[i]/body.mass)*timeDelta
+		body.velocityArray[i] += velocityDelta
+
+#Given a list of force vectors, calculate the net force
+#Adapted for arbitrary dimensions
 def netforce(forces):
-	netforce = [0, 0]
-	for i in forces:
-		netforce[0] += i[0]
-		netforce[1] += i[1]
+	netforce = [0 for i in xrange(len(forces[0]))]
+
+	for force in forces:
+		for i in xrange(len(force)):
+			netforce[i] += force[i]
+
 	return netforce
 
 #Calculate the next frame of the engine
 def tick(bodies):
-	global time
 	global tickrate
 
-	forces = {}
+	forcesActingOnEachBody = {}
 
-	for i in xrange(len(bodies)):
+	for i in xrange(len(bodies) - 1):
 		for j in xrange(i + 1, len(bodies)):
-			mforces = instgf(bodies[i], bodies[j])
-			if i in forces:
-				forces[i].append(mforces[0])
+			forcesBetweenCurrentTwoBodies = instantaneousGravitationalForcesBetweenTwoBodies(bodies[i], bodies[j])
+			if i in forcesActingOnEachBody:
+				forcesActingOnEachBody[i].append(forcesBetweenCurrentTwoBodies[0])
 			else:
-				forces[i] = [mforces[0]]
-			if j in forces:
-				forces[j].append(mforces[1])
+				forcesActingOnEachBody[i] = [forcesBetweenCurrentTwoBodies[0]]
+			if j in forcesActingOnEachBody:
+				forcesActingOnEachBody[j].append(forcesBetweenCurrentTwoBodies[1])
 			else:
-				forces[j] = [mforces[1]]	
-
-	# forces = instgf(b1, b2)
-	# f1 = forces[0]
-	# f2 = forces[1]
-
-	#print forces
+				forcesActingOnEachBody[j] = [forcesBetweenCurrentTwoBodies[1]]	
 
 	for i in xrange(len(bodies)):
-		bodies[i] = update(bodies[i], netforce(forces[i]), tickrate)
+		update(bodies[i], netforce(forcesActingOnEachBody[i]), tickrate)
 
 	return bodies
 
 #Determine if the ship has landed or not given current data
-def landcheck(b1, b2):
-	if detdist(b1, b2) < b2[3]:
+def landcheck(ship, celestialBody):
+	if distanceBetweenBodies(ship, celestialBody) < celestialBody.radius:
 		return True
 	else:
 		return False
 
 #Get the drawing coordinates for the planet given the planets data and info about
 #the frame
-def plntdc(planet, zero, sf):
-	zero1 = zero[:]
-	zero1[0] += sf*planet[2][0]
-	zero1[1] += sf*planet[2][1]
-	x1 = int(zero1[0] - sf*planet[3])
-	x2 = int(zero1[0] + sf*planet[3])
-	y1 = int(zero1[1] - sf*planet[3])
-	y2 = int(zero1[1] + sf*planet[3])
+def getDrawingCoordinatesForCelestialBody(celestialBody, centerOfCanvas, scaleFactor):
+	center = centerOfCanvas[:]
+	center[0] += scaleFactor*celestialBody.positionArray[0]
+	center[1] += scaleFactor*celestialBody.positionArray[1]
+	x1 = int(center[0] - scaleFactor*celestialBody.radius)
+	x2 = int(center[0] + scaleFactor*celestialBody.radius)
+	y1 = int(center[1] - scaleFactor*celestialBody.radius)
+	y2 = int(center[1] + scaleFactor*celestialBody.radius)
+
 	return [x1, y1, x2, y2]
 
 #Get the drawing coordinates for the ship given the ships data and info about the 
 #frame
-def shpdc(ship, zero, sf):
-	zero1 = zero[:]
-	zero1[0] += sf*ship[2][0]
-	zero1[1] += sf*ship[2][1]
-	x1 = int(zero1[0] - 5)
-	x2 = int(zero1[0] + 5)
-	y1 = int(zero1[1] - 5)
-	y2 = int(zero1[1] + 5)
+def getDrawingCoordinatesForBody(body, centerOfCanvas, scaleFactor):
+	center = centerOfCanvas[:]
+	center[0] += scaleFactor*body.positionArray[0]
+	center[1] += scaleFactor*body.positionArray[1]
+	x1 = int(center[0] - 5)
+	x2 = int(center[0] + 5)
+	y1 = int(center[1] - 5)
+	y2 = int(center[1] + 5)
+
 	return [x1, y1, x2, y2]
 
 #Animation of the engine
@@ -171,6 +196,7 @@ def main():
 	global time
 	global bodies
 
+	#Create The Canvas
 	root = Tkinter.Tk()
 	widthc = resolution
 	heightc = resolution
@@ -182,24 +208,24 @@ def main():
 
 	#Scale factor is so the ship is 90% of the way to the edge of the screen from 
 	#the planet, so that the animation always fits in the screen
-	sf = detdist(bodies[0], bodies[1])
-	sf = (widthc*9/20)/sf
+	scaleFactor = distanceBetweenBodies(bodies[0], bodies[1])
+	scaleFactor = (widthc*9/20)/scaleFactor
 
 	drawings = []
-	dcs = []
+	drawingCoordinates = []
 
 	for i in xrange(len(bodies)):
-		if len(bodies[i]) == 4:
-			dcs.append(plntdc(bodies[i], zero, sf))
+		if isinstance(bodies[i], CelestialBody):
+			drawingCoordinates.append(getDrawingCoordinatesForCelestialBody(bodies[i], zero, scaleFactor))
 		else:
-			dcs.append(shpdc(bodies[i], zero, sf))
+			drawingCoordinates.append(getDrawingCoordinatesForBody(bodies[i], zero, scaleFactor))
 
-	for j in dcs:
-		drawings.append(w.create_oval(j[0], j[1], j[2], j[3]))
+	for drawingCoordinate in drawingCoordinates:
+		drawings.append(w.create_oval(drawingCoordinate[0], drawingCoordinate[1], drawingCoordinate[2], drawingCoordinate[3]))
 	
-	lc = 0
+	shipHasNotLandedOrFlownOff = True
 
-	while lc < 1:
+	while shipHasNotLandedOrFlownOff:
 		#graphic.create_circle()
         
 		bodies = tick(bodies)
@@ -217,46 +243,46 @@ def main():
 
 		#delete planets
 		for i in xrange(len(bodies)):
-			if len(bodies[i]) == 4:
+			if isinstance(bodies[i], CelestialBody):
 				w.delete(drawings[i])
 			else:
 				if not TraceShip:
 					w.delete(drawings[i])
 
-		dcs = []
+		drawingCoordinates = []
 
 		for i in xrange(len(bodies)):
-			if len(bodies[i]) == 4:
-				dcs.append(plntdc(bodies[i], zero, sf))
+			if isinstance(bodies[i], CelestialBody):
+				drawingCoordinates.append(getDrawingCoordinatesForCelestialBody(bodies[i], zero, scaleFactor))
 			else:
-				dcs.append(shpdc(bodies[i], zero, sf))
+				drawingCoordinates.append(getDrawingCoordinatesForBody(bodies[i], zero, scaleFactor))
 
 		for i in xrange(len(drawings)):
-			info = dcs[i]
+			info = drawingCoordinates[i]
 			drawings[i] = w.create_oval(info[0], info[1], info[2], info[3])
 
 		w.update()
 
 		for i in xrange(len(bodies)):
-			if len(bodies[i]) < 4:
-				shpc = dcs[i]
-				if ((abs((shpc[0] + shpc[2])/2) > widthc) or (abs((shpc[1] + shpc[3])/2) > heightc)) or ((abs((shpc[0] + shpc[2])/2) < 0) or (abs((shpc[1] + shpc[3])/2) < 0)):
-					lc = 1
+			if not isinstance(bodies[i], CelestialBody):
+				bodyCoordinates = drawingCoordinates[i]
+				if ((abs((bodyCoordinates[0] + bodyCoordinates[2])/2) > widthc) or (abs((bodyCoordinates[1] + bodyCoordinates[3])/2) > heightc)) or ((abs((bodyCoordinates[0] + bodyCoordinates[2])/2) < 0) or (abs((bodyCoordinates[1] + bodyCoordinates[3])/2) < 0)):
+					shipHasNotLandedOrFlownOff = False
 					print "goodbye ship"
 
 		for i in xrange(len(bodies)):
 			for j in xrange(i + 1, len(bodies)):
-				if len(bodies[i]) == 4:
-					if len(bodies[j]) < 4:
+				if isinstance(bodies[i], CelestialBody):
+					if not isinstance(bodies[j], CelestialBody):
 						if landcheck(bodies[j], bodies[i]):
-							lc = 1
+							shipHasNotLandedOrFlownOff = False
 							print
 							print "The ship has landed on the planet, which is now at "
 							print str(planet[2])[1:-1]
 				else:
-					if len(bodies[j]) == 4:
+					if isinstance(bodies[j], CelestialBody):
 						if landcheck(bodies[i], bodies[j]):
-							lc = 1
+							shipHasNotLandedOrFlownOff = False
 							print
 							print "The ship has landed on the planet, which is now at "
 							print str(planet[2])[1:-1]
